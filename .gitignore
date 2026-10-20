@@ -1,0 +1,10 @@
+.private/
+.env
+.env.*
+!.env.example
+node_modules/
+*.enc
+*.key
+*.log
+.DS_Store
+Thumbs.db
