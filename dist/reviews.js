@@ -1,0 +1,18 @@
+const reviewForm=document.getElementById('website-review-form');
+if(reviewForm){
+  const reviewList=document.getElementById('website-reviews');const reviewMessage=document.getElementById('review-form-message');let reviewSubmitting=false;
+  const textNode=(parent,tag,text,className)=>{const el=document.createElement(tag);el.textContent=text;if(className)el.className=className;parent.append(el);return el;};
+  async function loadWebsiteReviews(){
+    try{const response=await fetch('/api/reviews',{cache:'no-store'});if(!response.ok)throw new Error();const result=await response.json();reviewList.replaceChildren();const count=result.summary.count;document.getElementById('website-review-summary').textContent=count?result.summary.average.toFixed(1)+'/5 · '+count+' website '+(count===1?'review':'reviews'):'No website reviews yet';document.getElementById('website-review-empty').hidden=count>0;
+      for(const review of result.reviews){const card=textNode(reviewList,'article','','website-review-card');const top=textNode(card,'div','','website-review-card-top');textNode(top,'strong',review.displayName);const stars=textNode(top,'span','★'.repeat(review.rating)+'☆'.repeat(5-review.rating),'review-stars');stars.setAttribute('aria-label',review.rating+' out of 5 stars');textNode(card,'p',review.text);textNode(card,'small','Website review · '+new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',month:'short',day:'numeric',year:'numeric'}).format(new Date(review.createdAt)));}
+    }catch{document.getElementById('website-review-summary').textContent='Website reviews are temporarily unavailable.';}
+  }
+  reviewForm.querySelectorAll('[name="rating"]').forEach(input=>input.addEventListener('change',()=>{for(const label of reviewForm.querySelectorAll('.review-rating-options label'))label.classList.toggle('rating-selected',Number(label.querySelector('input').value)<=Number(input.value));}));
+  reviewForm.addEventListener('submit',async event=>{
+    event.preventDefault();if(reviewSubmitting||!reviewForm.reportValidity())return;reviewSubmitting=true;const button=reviewForm.querySelector('[type="submit"]');button.disabled=true;button.textContent='Submitting review…';reviewMessage.textContent='';
+    try{const sessionResponse=await fetch('/api/session',{cache:'no-store',credentials:'same-origin'});if(!sessionResponse.ok)throw new Error('Reviews are temporarily unavailable. Please try again later.');const session=await sessionResponse.json();const response=await fetch('/api/reviews',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':session.csrf},body:JSON.stringify({displayName:reviewForm.elements.displayName.value.trim(),rating:Number(reviewForm.elements.rating.value),text:reviewForm.elements.text.value.trim(),consent:reviewForm.elements.consent.checked,website:reviewForm.elements.website.value})});const result=await response.json();if(!response.ok)throw new Error(result.error||'Your review could not be submitted.');reviewForm.reset();reviewForm.querySelectorAll('.rating-selected').forEach(label=>label.classList.remove('rating-selected'));reviewMessage.textContent='Thank you. Your review was submitted for moderation and will appear here if approved.';reviewMessage.dataset.success='true';}
+    catch(error){reviewMessage.dataset.success='false';reviewMessage.textContent=error instanceof TypeError?'Connection unavailable. Please try again later.':error.message;}
+    finally{reviewSubmitting=false;button.disabled=false;button.innerHTML='Submit review <span aria-hidden="true">↗</span>';}
+  });
+  loadWebsiteReviews();
+}
